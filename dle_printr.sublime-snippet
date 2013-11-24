@@ -1,0 +1,11 @@
+<snippet>
+	<content><![CDATA[
+echo "<pre class='dle-pre'>"; print_r(${1:arResult}); echo "</pre>";
+${0}
+]]></content>
+	<!-- Optional: Set a tabTrigger to define how to trigger the snippet -->
+	<tabTrigger>dle_printr</tabTrigger>
+	<!-- Optional: Set a scope to limit where the snippet will trigger -->
+	<!-- <scope>source.python</scope> -->
+	<description>print_r DLE</description>
+</snippet>

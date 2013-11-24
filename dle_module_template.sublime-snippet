@@ -1,0 +1,46 @@
+<snippet>
+	<content><![CDATA[
+<?php
+if (!defined('DATALIFEENGINE'))
+	die("Go fuck yourself!");
+\$userName  = !empty(\$userName) ? \$db->safesql(strip_tags(stripslashes(\$userName))) : false;
+\$userName  = (\$userName == 'this' && \$member_id['user_group'] != 5) ? \$member_id['name'] : \$userName;
+\$myConfig  = array(
+	'userName' => \$userName,
+	'catId' => !empty(\$catId) ? \$catId : '1',
+	'template' => !empty(\$template) ? \$template : 'default',
+	'cachePrefix' => !empty(\$cachePrefix) ? \$cachePrefix : 'news',
+	'cacheSuffix' => !empty(\$cacheSuffix) ? true : false
+);
+\$cacheName = md5(implode('_', \$myConfig));
+\$myModule  = false;
+\$myModule  = dle_cache(\$myConfig['cachePrefix'], \$cacheName . \$config['skin'], \$myConfig['cacheSuffix']);
+if (!\$myModule) {
+	if (file_exists(TEMPLATE_DIR . '/' . \$myConfig['template'] . '.tpl')) {
+		if (!isset(\$tpl)) {
+			\$tpl      = new dle_template();
+			\$tpl->dir = TEMPLATE_DIR;
+		} else {
+			\$tpl->result['myModule'] = '';
+		}
+		\$tpl->load_template(\$myConfig['template'] . '.tpl');
+		\$row   = \$db->super_query("SELECT COUNT(*) as count FROM " . PREFIX . "_post WHERE category = '" . \$myConfig['catId'] . "' AND autor = '" . \$myConfig['userName'] . "'");
+		\$count = (\$row['count'] > 0) ? \$row['count'] : 'новостей нет';
+		\$tpl->set('{tag_name}', \$count);
+		\$tpl->compile('myModule');
+		\$myModule = \$tpl->result['myModule'];
+		create_cache(\$myConfig['cachePrefix'], \$myModule, \$cacheName . \$config['skin'], \$myConfig['cacheSuffix']);
+		\$tpl->clear();
+	} else {
+		\$myModule = '<b style="color:red">Отсутствует файл шаблона: ' . \$config['skin'] . '/' . \$myConfig['template'] . '.tpl</b>';
+	}
+}
+echo \$myModule;
+?>
+]]></content>
+	<!-- Optional: Set a tabTrigger to define how to trigger the snippet -->
+	<tabTrigger>dle_module_template</tabTrigger>
+	<!-- Optional: Set a scope to limit where the snippet will trigger -->
+	<!-- <scope>source.python</scope> -->
+	<description>Заготовка для модуля с шаблоном.</description>
+</snippet>

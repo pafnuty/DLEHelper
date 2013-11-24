@@ -1,0 +1,24 @@
+<snippet>
+	<content><![CDATA[
+<?php
+if (!defined('DATALIFEENGINE')) die("Go fuck yourself!");
+\$myConfig  = array(
+    'cachePrefix' => !empty(\$cachePrefix) ? \$cachePrefix : 'archives',
+    'cacheSuffix' => !empty(\$cacheSuffix) ? \$cacheSuffix : false
+);
+\$cacheName = md5(implode('_', \$myConfig));
+\$myModule  = false;
+\$myModule  = dle_cache(\$myConfig['cachePrefix'], \$cacheName . \$config['skin'], \$myConfig['cacheSuffix']);
+if (!\$myModule) {
+    \$myModule = 'Hello World!'; // Результат работы модуля.
+    create_cache(\$myConfig['cachePrefix'], \$myModule, \$cacheName . \$config['skin'], \$myConfig['cacheSuffix']);
+}
+echo \$myModule;
+?>
+]]></content>
+	<!-- Optional: Set a tabTrigger to define how to trigger the snippet -->
+	<tabTrigger>dle_module</tabTrigger>
+	<!-- Optional: Set a scope to limit where the snippet will trigger -->
+	<!-- <scope>source.python</scope> -->
+	<description>Заготовка для модуля без шаблона.</description>
+</snippet>
