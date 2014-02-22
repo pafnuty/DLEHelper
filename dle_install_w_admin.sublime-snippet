@@ -1,7 +1,6 @@
 <snippet>
 	<content><![CDATA[
 <?php
-
 // Первым делом подключаем DLE_API как это ни странно, но в данном случаи это упрощает жизнь разработчика.
 include('engine/api/api.class.php');
 
@@ -11,19 +10,19 @@ include('engine/api/api.class.php');
  */
 \$cfg = array(
 	// Идентификатор модуля (для внедения в админпанель и назначение имени иконки с расширением .png)
-	'moduleName'    => '${1:rss_comm}',
+	'moduleName'    => '${1:fake_users_search}',
 
 	// Название модуля - показывается как в установщике, так и в админке.
-	'moduleTitle'   => '${2:RSS Comments}',
+	'moduleTitle'   => '${2:Fake Users Search}',
 
 	// Описание модуля, для установщика и админки.
-	'moduleDescr'   => '${3:Модуль показа RSS ленты комментариев к новостям и всех последних комментариев}',
+	'moduleDescr'   => '${3:Модуль поиска и удаления фэйковых пользователей}',
 
 	// Версия модуля, для установщика
-	'moduleVersion' => '${4:0.0.1}',
+	'moduleVersion' => '${4:1.2}',
 
 	// Дата выпуска модуля, для установщика
-	'moduleDate'    => '${5:24.11.2013}',
+	'moduleDate'    => '${5:12.01.2014}',
 
 	// Версии DLE, поддержваемые модулем, для установщика
 	'dleVersion'    => '${6:9.x - 10.x}',
@@ -32,19 +31,35 @@ include('engine/api/api.class.php');
 	'allowGroups'   => '1',
 
 	// Массив с запросами, которые будут выполняться при установке
-	'queries'       => array(${7:
-			"SELECT * FROM " . PREFIX . "_post WHERE id = '1'",
-			"SELECT * FROM " . PREFIX . "_usergroups"
+	'queries'       => array(${7: 
+		"SELECT * FROM " . PREFIX . "_post WHERE id = '1'",
+		"SELECT * FROM " . PREFIX . "_usergroups"
 		}),
 
 	// Устанавливать админку (true/false). Включает показ кнопки установки и удаления админки.
-	'installAdmin'  => ${8:true}
+	'installAdmin'  => ${8:true},
+
+	// Отображать шаги утановки модуля
+	'steps'         => ${9:false}
 
 );
 
+// Определяем кодировку.
+\$fileCharset = chasetConflict(\$cfg);
+
+// Шаги установки модуля
+\$steps = <<<HTML
+<div class="descr">
+	<h2>Редактирование файлов</h2>
+	<ol>
+		<li>Выполнить установку админчасти модуля (кнопка ниже).</li>
+	</ol>
+</div>
+HTML;
+
 
 function installer() {
-	global \$config, \$dle_api, \$cfg;
+	global \$config, \$dle_api, \$cfg, \$steps, \$fileCharset;
 
 	\$output = '';
 
@@ -109,11 +124,11 @@ function installer() {
 			\$uninstallForm = <<<HTML
 			<hr>
 			<div class="form-field clearfix">
-				<div class="lebel">Удаление админчасти модуля</div>
+				<div class="lebel red">Удаление админчасти модуля</div>
 				<div class="control">
 					<form method="POST">            
 						<input type="hidden" name="remove" value="1">
-						<button class="btn" type="submit">Удалить админчасть модуля</button>
+						<button class="btn active" type="submit">Удалить админчасть модуля</button>
 					</form>
 				</div>
 			</div>
@@ -139,23 +154,30 @@ HTML;
 		}
 		// Выводим кнопку установки админчасти модуля
 		else {
-			\$installForm = <<<HTML
-			<div class="form-field clearfix">
-				<div class="lebel">Установка админчасти</div>
-				<div class="control">
-					<form method="POST">            
-						<input type="hidden" name="install" value="1">
-						<button class="btn" type="submit">Установить админчасть модуля</button>
-					</form>
+			if (!\$adminInstalled) {
+				\$installForm = <<<HTML
+				<div class="form-field clearfix">
+					<div class="lebel">Установка админчасти</div>
+					<div class="control">
+						<form method="POST">            
+							<input type="hidden" name="install" value="1">
+							<button class="btn" type="submit">Установить админчасть модуля</button>
+						</form>
+					</div>
 				</div>
-			</div>
 HTML;
+			}
 		}
 
 		// Вывод
+		if (\$cfg['steps']) {
+			\$output .= \$steps;
+		}
 		\$output .= <<<HTML
 			<p class="alert">Перед установкой модуля обязательно <a href="/{\$config['admin_path']}?mod=dboption" target="_blank" title="Открыть инструменты работы с БД DLE в новом окне">сделайте бэкап БД</a>!</p>
 			<div class="descr">
+				<h2>Выполнение запросов в БД</h2>
+
 				\$installForm
 				\$uninstallForm
 			</div>
@@ -164,15 +186,52 @@ HTML;
 
 	}
 
+	// Если руки пользователя кривые, или он просто забыл перекодировать файлы - скажем ему об этом.
+	if (\$fileCharset['conflict']) {
+		\$output = '<h2 class="red ta-center">Ошибка!</h2><p class="alert">Кодировка файла установщика (<b>' . \$fileCharset['charset'] . '</b>) не совпадает с кодировкой сайта (<b>' . \$config['charset'] . '</b>). <br />Установка не возможна. <br />Перекодируйте все php файлы модуля и запустите установщик ещё раз.</p> <hr />';
+	}
+
 	// Функция возвращает то, что должно быть выведено
 	return \$output;
+}
+
+/**
+ * Отлавливаем данные о кодировке файла (utf-8 или windows-1251);
+ * @param  string \$string - строка (или массив), в которой требуется определить кодировку.
+ *
+ * @return array          - возвращает массив с определением конфликта кодировки строки и сайта, а так же сму кодировку строки.
+ */
+function chasetConflict(\$string) {
+	global \$config;
+	if (is_array(\$string)) {
+		\$string = implode(' ', \$string);
+	}
+	\$detect = preg_match(
+		'%(?:
+		[\xC2-\xDF][\x80-\xBF]             # non-overlong 2-byte
+		|\xE0[\xA0-\xBF][\x80-\xBF]        # excluding overlongs
+		|[\xE1-\xEC\xEE\xEF][\x80-\xBF]{2} # straight 3-byte
+		|\xED[\x80-\x9F][\x80-\xBF]        # excluding surrogates
+		|\xF0[\x90-\xBF][\x80-\xBF]{2}     # planes 1-3
+		|[\xF1-\xF3][\x80-\xBF]{3}         # planes 4-15
+		|\xF4[\x80-\x8F][\x80-\xBF]{2}     # plane 16
+		)+%xs',
+		\$string
+	);
+	\$stringCharset = (\$detect == '1') ? 'utf-8' : 'windows-1251';
+	\$config['charset'] = strtolower(\$config['charset']);
+	\$return = array();
+	\$return['conflict'] = (\$stringCharset == \$config['charset']) ? false : true;
+	\$return['charset'] = \$stringCharset;
+
+	return \$return;
 }
 
 ?>
 <!DOCTYPE html>
 <html>
 <head>
-	<meta charset="<?=\$config['charset']?>">
+	<meta charset="<?=\$fileCharset['charset']?>">
 	<title><?=\$cfg['moduleTitle']?></title>
 	<meta name="viewport" content="width=device-width">
 	<link href="http://fonts.googleapis.com/css?family=Ubuntu+Condensed&subset=latin,cyrillic" rel="stylesheet">
@@ -232,7 +291,7 @@ HTML;
 </head>
 <body>
 	<header>
-		<h1 class="ta-center"><big class="red"><?=\$cfg['moduleTitle']?> v.<?=\$cfg['moduleVersion']?> от <?=\$cfg['moduleDate']?></big></h1>
+		<h1 class="ta-center"><big class="red"><?=\$cfg['moduleTitle']?></big> v.<?=\$cfg['moduleVersion']?> от <?=\$cfg['moduleDate']?></h1>
 		<hr>
 	</header>
 	<section>  
@@ -245,31 +304,30 @@ HTML;
 		?>
 
 	</section> 	
-	<p>Автор: <a href="http://pafnuty.name/" target="_blank">ПафНутиЙ</a></p>
+	<div>
+		Информация об авторе: <br>
+		<a href="http://pafnuty.name/" target="_blank" title="Сайт автора">ПафНутиЙ</a> <br>
+		<a href="https://twitter.com/pafnuty_name" target="_blank" title="Twitter">@pafnuty_name</a> <br>
+		<a href="http://gplus.to/pafnuty" target="_blank" title="google+">+Павел</a> <br>
+		<a href="mailto:pafnuty10@gmail.com" title="email автора">pafnuty10@gmail.com</a>
+	</div>
 
 	<!-- scripts -->
 	<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+	<script src="http://cdnjs.cloudflare.com/ajax/libs/autosize.js/1.18.1/jquery.autosize.min.js"></script>
 	<script>
-		/*!
-			Autosize v1.18.1 - 2013-11-05
-			Automatically adjust textarea height based on user input.
-			(c) 2013 Jack Moore - http://www.jacklmoore.com/autosize
-			license: http://www.opensource.org/licenses/mit-license.php
-		*/
-		(function(e){var t,o={className:"autosizejs",append:"",callback:!1,resizeDelay:10},i='<textarea tabindex="-1" style="position:absolute; top:-999px; left:0; right:auto; bottom:auto; border:0; padding: 0; -moz-box-sizing:content-box; -webkit-box-sizing:content-box; box-sizing:content-box; word-wrap:break-word; height:0 !important; min-height:0 !important; overflow:hidden; transition:none; -webkit-transition:none; -moz-transition:none;"/>',n=["fontFamily","fontSize","fontWeight","fontStyle","letterSpacing","textTransform","wordSpacing","textIndent"],s=e(i).data("autosize",!0)[0];s.style.lineHeight="99px","99px"===e(s).css("lineHeight")&&n.push("lineHeight"),s.style.lineHeight="",e.fn.autosize=function(i){return this.length?(i=e.extend({},o,i||{}),s.parentNode!==document.body&&e(document.body).append(s),this.each(function(){function o(){var t,o;"getComputedStyle"in window?(t=window.getComputedStyle(u,null),o=u.getBoundingClientRect().width,e.each(["paddingLeft","paddingRight","borderLeftWidth","borderRightWidth"],function(e,i){o-=parseInt(t[i],10)}),s.style.width=o+"px"):s.style.width=Math.max(p.width(),0)+"px"}function a(){var a={};if(t=u,s.className=i.className,d=parseInt(p.css("maxHeight"),10),e.each(n,function(e,t){a[t]=p.css(t)}),e(s).css(a),o(),window.chrome){var r=u.style.width;u.style.width="0px",u.offsetWidth,u.style.width=r}}function r(){var e,n;t!==u?a():o(),s.value=u.value+i.append,s.style.overflowY=u.style.overflowY,n=parseInt(u.style.height,10),s.scrollTop=0,s.scrollTop=9e4,e=s.scrollTop,d&&e>d?(u.style.overflowY="scroll",e=d):(u.style.overflowY="hidden",c>e&&(e=c)),e+=w,n!==e&&(u.style.height=e+"px",f&&i.callback.call(u,u))}function l(){clearTimeout(h),h=setTimeout(function(){var e=p.width();e!==g&&(g=e,r())},parseInt(i.resizeDelay,10))}var d,c,h,u=this,p=e(u),w=0,f=e.isFunction(i.callback),z={height:u.style.height,overflow:u.style.overflow,overflowY:u.style.overflowY,wordWrap:u.style.wordWrap,resize:u.style.resize},g=p.width();p.data("autosize")||(p.data("autosize",!0),("border-box"===p.css("box-sizing")||"border-box"===p.css("-moz-box-sizing")||"border-box"===p.css("-webkit-box-sizing"))&&(w=p.outerHeight()-p.height()),c=Math.max(parseInt(p.css("minHeight"),10)-w||0,p.height()),p.css({overflow:"hidden",overflowY:"hidden",wordWrap:"break-word",resize:"none"===p.css("resize")||"vertical"===p.css("resize")?"none":"horizontal"}),"onpropertychange"in u?"oninput"in u?p.on("input.autosize keyup.autosize",r):p.on("propertychange.autosize",function(){"value"===event.propertyName&&r()}):p.on("input.autosize",r),i.resizeDelay!==!1&&e(window).on("resize.autosize",l),p.on("autosize.resize",r),p.on("autosize.resizeIncludeStyle",function(){t=null,r()}),p.on("autosize.destroy",function(){t=null,clearTimeout(h),e(window).off("resize",l),p.off("autosize").off(".autosize").css(z).removeData("autosize")}),r())})):this}})(window.jQuery||window.\$);
-
 		jQuery(document).ready(function (\$) {
 			\$('textarea').autosize();
 			\$('textarea').click(function () {
 				\$(this).select();
 			});
-			\$('body').on('click', '#wtq', function () {
-				\$('.queries').slideToggle(400);
-				\$(this).toggleClass('active');
-			})
-
 		});
+		\$(document).on('click', '#wtq', function () {
+			\$('.queries').slideToggle(400);
+			\$(this).toggleClass('active');
+		})
 	</script>
+	<!-- scripts -->
 	<!-- scripts -->
 </body>
 </html>
